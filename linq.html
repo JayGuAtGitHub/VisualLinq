@@ -1,0 +1,42 @@
+<html>
+    <head>
+        <script src="node_modules/esprima/dist/esprima.js"></script>
+        <script type="text/javascript" src="linq.js"></script>    
+        <script>
+            var pipelineType = new RuntimeTypes.RuntimeType();
+            pipelineType.Name = "pipeline";
+            pipelineType.Fields = [{Name:"PipelineNbr",Type:"string"}
+                ,{Name:"ProductId",Type:"number"}
+                ,{Name:"CompanyId",Type:"number"}];
+            var companyType = new RuntimeTypes.RuntimeType();
+            companyType.Name = "company";
+            companyType.Fields = [{Name:"CompanyId",Type:"number"}
+                ,{Name:"NameEn",Type:"string"}
+                ,{Name:"NameCn",Type:"string"}];
+            var productType = new RuntimeTypes.RuntimeType();
+            productType.Name = "product";
+            productType.Fields = [{Name:"ProductId",Type:"number"}
+                ,{Name:"NameEn",Type:"string"}
+                ,{Name:"NameCn",Type:"string"}];
+            var pipelineTable = Linq.Queryable.CreateWithDescription(pipelineType);
+            var companyTable = Linq.Queryable.CreateWithDescription(companyType);
+            var productTable = Linq.Queryable.CreateWithDescription(productType);
+
+            var join = pipelineTable.Join(
+                companyTable,
+                (pipeline,company) => pipeline.CompanyId && company.CompanyId,
+                (pipeline,company) => {
+                    return {
+                        PipelineNbr:pipeline.PipelineNbr,
+                        CompanyId:pipeline.CompanyId,
+                        CompanyNameCn:company.NameCn,
+                        CompanyNameEn:company.NameEn
+                    }
+                }
+            )
+
+
+        </script>
+    </head>
+    <body></body>
+</html>
