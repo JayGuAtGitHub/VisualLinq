@@ -4,27 +4,27 @@
         <script type="text/javascript" src="linq.js"></script>    
         <script>
             var pipelineType = new RuntimeTypes.RuntimeType();
-            pipelineType.Name = "pipeline";
-            pipelineType.Fields = [{Name:"PipelineNbr",Type:"string"}
-                ,{Name:"ProductId",Type:"number"}
-                ,{Name:"CompanyId",Type:"number"}];
+            pipelineType.Name = "sql_pipeline";
+            pipelineType.Fields = [{Name:"PipelineNbr",NativeType:RuntimeTypes.NativeType.string}
+                ,{Name:"ProductId",NativeType:RuntimeTypes.NativeType.number}
+                ,{Name:"CompanyId",NativeType:RuntimeTypes.NativeType.number}];
             var companyType = new RuntimeTypes.RuntimeType();
-            companyType.Name = "company";
-            companyType.Fields = [{Name:"CompanyId",Type:"number"}
-                ,{Name:"NameEn",Type:"string"}
-                ,{Name:"NameCn",Type:"string"}];
+            companyType.Name = "sql_company";
+            companyType.Fields = [{Name:"CompanyId",NativeType:RuntimeTypes.NativeType.number}
+                ,{Name:"NameEn",NativeType:RuntimeTypes.NativeType.string}
+                ,{Name:"NameCn",NativeType:RuntimeTypes.NativeType.string}];
             var productType = new RuntimeTypes.RuntimeType();
-            productType.Name = "product";
-            productType.Fields = [{Name:"ProductId",Type:"number"}
-                ,{Name:"NameEn",Type:"string"}
-                ,{Name:"NameCn",Type:"string"}];
+            productType.Name = "sql_product";
+            productType.Fields = [{Name:"ProductId",NativeType:RuntimeTypes.NativeType.number}
+                ,{Name:"NameEn",NativeType:RuntimeTypes.NativeType.string}
+                ,{Name:"NameCn",NativeType:RuntimeTypes.NativeType.string}];
             var pipelineTable = Linq.Queryable.CreateWithDescription(pipelineType);
             var companyTable = Linq.Queryable.CreateWithDescription(companyType);
             var productTable = Linq.Queryable.CreateWithDescription(productType);
 
             var join = pipelineTable.Join(
                 companyTable,
-                (pipeline,company) => pipeline.CompanyId && company.CompanyId,
+                (pipeline,company) => pipeline.CompanyId == company.CompanyId,
                 (pipeline,company) => {
                     return {
                         PipelineNbr:pipeline.PipelineNbr,
@@ -33,7 +33,23 @@
                         CompanyNameEn:company.NameEn
                     }
                 }
-            )
+            );
+            var g_str = "123"
+            var joinStr = join.ToSql();
+            //var where = pipelineTable.Where(t => t.ProductId.includes(g_str));
+            var where = pipelineTable.Where(t => t.ProductId != 2);
+            var whereStr = where.ToSql();
+            var select = pipelineTable.Select(t => {return {CompanyId:t.CompanyId}});
+            var selectStr = select.ToSql();
+            var groupBy = pipelineTable
+            .GroupBy(t => {return {CompanyId:t.CompanyId}})
+            .Select(t => {return {CompanyId:t.Key.CompanyId,Count:t.Count(c => c.ProductId)}});
+            var groupByStr = groupBy.ToSql();
+            console.log(joinStr);
+            console.log(whereStr);
+            console.log(selectStr);
+            console.log(groupByStr);
+            
 
 
         </script>

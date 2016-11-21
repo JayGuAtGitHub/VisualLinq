@@ -14,42 +14,57 @@
 
 module Linq{
     export class Queryable<T> extends BaseQueryable implements IQueryable<T> {
-
-        static CreateWithDescription<T>(value : RuntimeTypes.RuntimeType,genericType:T) : Queryable<T>{
-            var result = new Queryable();
-            result.ObjectQuery
-            result.Type = value;
+        static CreateGroupingType(groupType:RuntimeTypes.RuntimeType,genericType : RuntimeTypes.RuntimeType): RuntimeTypes.RuntimeType{
+            let type = new RuntimeTypes.RuntimeType();
+            type.IsGeneric = true;
+            type.GenericWrapperTypeName = "Grouping";
+            type.GenericItemsTypes = [groupType,genericType];
+            return type;
+        }
+        
+        static CreateQueryableType(value : RuntimeTypes.RuntimeType): RuntimeTypes.RuntimeType{
+            let type = new RuntimeTypes.RuntimeType();
+            type.IsGeneric = true;
+            type.GenericWrapperTypeName = "Queryable";
+            type.GenericItemsTypes = [value];
+            return type;
+        }
+        static CreateWithDescription<T>(provider:Linq.Providers.IQueryProvider,value : RuntimeTypes.RuntimeType,genericType:T) : Queryable<T>{
+            var result = new Queryable<T>(provider);
+            result.Type = Linq.Queryable.CreateQueryableType(value);
             return result;
         }
         Where<T>(predicate: (element) => boolean):IQueryable<T>{
             return this.WhereUsingLambda(new Linq.Expressions.JsLambdaExpression(predicate.toString()));
         }
         WhereUsingLambda<T>(predicate: Linq.Expressions.JsLambdaExpression):IQueryable<T>{
-            return this._where(this.ObjectQuery,predicate);
+            return this._where(this,predicate);
         }
-        private _where<T>(_this:Linq.Expressions.IExpression,predicate:Linq.Expressions.JsLambdaExpression):IQueryable<T>{
-            var result = new Queryable();
+        private _where<T>(_this:BaseQueryable,predicate:Linq.Expressions.JsLambdaExpression):IQueryable<T>{
+            var result = new Queryable(this.Provider);
             var methodCall = new Linq.Expressions.MethodCallExpression();
-            methodCall.Arguments = [this.ObjectQuery,predicate];
+            methodCall.Arguments = [_this,predicate];
             methodCall.Method = "Where";
-            methodCall.ReturnType = this.Type;
+            methodCall.ReturnType = _this.Type;
             result.ObjectQuery = methodCall;
+            result.Type = result.ObjectQuery.ReturnType;
             return result;
         }
         Select<T,TResult>(selector: (element: T) => TResult):IQueryable<TResult>{
             return this.SelectUsingLambda(new Linq.Expressions.JsLambdaExpression(selector.toString()));
         }
         SelectUsingLambda<T,TResult>(selector: Linq.Expressions.JsLambdaExpression):IQueryable<TResult>{
-            return this._select(this.ObjectQuery,selector);
+            return this._select(this,selector);
         }
-        private _select<T,TResult>(methodExp:Linq.Expressions.IExpression
+        private _select<T,TResult>(_this:BaseQueryable
         ,selector:Linq.Expressions.JsLambdaExpression):IQueryable<TResult>{
-            var result = new Queryable();
+            var result = new Queryable(this.Provider);
             var methodCall = new Linq.Expressions.MethodCallExpression();
-            methodCall.Arguments = [methodExp,selector];
+            methodCall.Arguments = [_this,selector];
             methodCall.Method = "Select";
-            methodCall.ReturnType = this._parseSelect(selector);
+            methodCall.ReturnType = Linq.Queryable.CreateQueryableType(this._parseSelect(selector));
             result.ObjectQuery = methodCall;
+            result.Type = result.ObjectQuery.ReturnType;
             return result;
         }
         private _parseSelect(selector:Linq.Expressions.JsLambdaExpression) : RuntimeTypes.RuntimeType
@@ -61,20 +76,37 @@ module Linq{
                 //not support t => {return {a:1}}
                 var valueType = element.value.type;
                 if(valueType==='MemberExpression'){
-                    var field = this.Type.GetField(element.value.property.name);
+                    if(this.Type.Name == "Queryable"){
+                        var field = this.ElementType.GetField(element.value.property.name);
+                    }
+                    if(this.Type.Name == "Grouping"){
+                        for(var i of this.Type.GenericItemsTypes){
+                            var field = i.GetField(element.value.property.name);
+                            if(i != null){
+                                break;
+                            }
+                        }
+                    }
+                    var field = this.ElementType.GetField(element.value.property.name);
+                    if(field == null){
+                        field = this.Type.GetField(element.value.property.name);
+                    }
                     if(field == null){
                         throw Linq.Exceptions.ConstSystemExceptions.KeyNotFoundInEntity;
                     }
                     return {Name:element.key.name,NativeType:field.NativeType};
                 }
                 if(valueType==='CallExpression'){
-                    if(element.value.callee.property.name === 'Count'){
+                    var calleeName = element.value.callee.property.name;
+                    if(calleeName === 'Count' ||
+                    calleeName === 'Max' ||
+                    calleeName === 'Avg' ||
+                    calleeName === 'Min' ||
+                    calleeName === 'Sum' 
+                    ){
                         return {Name:element.key.name,NativeType:RuntimeTypes.NativeType.number};
                     }
                 
-                    if(element.value.callee.property.name === 'CountDistinct'){
-                        return {Name:element.key.name,NativeType:RuntimeTypes.NativeType.number};
-                    }
                     
                 }
                 throw Linq.Exceptions.ConstSystemExceptions.MethodNotSupportInLambdaExpression;
@@ -86,23 +118,22 @@ module Linq{
             return this.GroupByUsingLambda<TKey,TSource>(new Linq.Expressions.JsLambdaExpression(groupAt.toString()));
         }
         GroupByUsingLambda<TKey,TSource>(groupAt: Linq.Expressions.JsLambdaExpression):IGrouping<TKey,TSource>{
-            return this._groupBy<TKey,TSource>(this.ObjectQuery,groupAt);
+            return this._groupBy<TKey,TSource>(this,groupAt);
         }
-        private _groupBy<TKey,TSource>(methodExp:Linq.Expressions.IExpression,groupAt:Linq.Expressions.JsLambdaExpression)
+        private _groupBy<TKey,TSource>(t_value:BaseQueryable,groupAt:Linq.Expressions.JsLambdaExpression)
         :IGrouping<TKey,TSource>{
-            var result = new Grouping<TKey,TSource>();
+            var result = new Grouping<TKey,TSource>(this.Provider);
             result.ObjectQuery = new Linq.Expressions.MethodCallExpression();
-            result.ObjectQuery.Arguments = [methodExp,groupAt];
+            result.ObjectQuery.Arguments = [t_value,groupAt];
             result.ObjectQuery.Method = "GroupBy";
-            result.ObjectQuery.ReturnType = methodExp.ReturnType;
-            result.KeyType = new RuntimeTypes.RuntimeType();
-            result.KeyType.Fields = esprima.parse(groupAt.Body).body[0]
+            let keyType = new RuntimeTypes.RuntimeType();
+            keyType.Fields = esprima.parse(groupAt.Body).body[0]
             .expression.body.body[0].argument.properties.map(element => {
                 //support t => {return {a:t.a}}
                 //not support t => {return {a:1}}
                 var valueType = element.value.type;
                 if(valueType==='MemberExpression'){
-                    var field = this.Type.GetField(element.value.property.name);
+                    var field = this.ElementType.GetField(element.value.property.name);
                     if(field == null){
                         throw Linq.Exceptions.ConstSystemExceptions.KeyNotFoundInEntity;
                     }
@@ -111,40 +142,44 @@ module Linq{
                 throw Linq.Exceptions.ConstSystemExceptions.MethodNotSupportInLambdaExpression;
                 
             });
+            result.ObjectQuery.ReturnType = 
+            Linq.Queryable.CreateGroupingType(keyType,t_value.Type);
+            result.Type = result.ObjectQuery.ReturnType;
             return result;
         }
 
-        Join<T,TJoined,TResult>(joined : Queryable<T>
+        Join<T,TJoined,TResult>(joined : Queryable<TJoined>
         ,predicate : (source:T,joined :TJoined) => boolean
         ,resultSelector : (source:T,joined :TJoined) => TResult) : IQueryable<TResult>{
             return this.JoinUsingLambda(joined
             ,new Linq.Expressions.JsLambdaExpression(predicate.toString())
             ,new Linq.Expressions.JsLambdaExpression(resultSelector.toString()))
         }
-        JoinUsingLambda<T,TJoined,TResult>(joined : Queryable<T>
+        JoinUsingLambda<T,TJoined,TResult>(joined : Queryable<TJoined>
         ,predicate: Linq.Expressions.JsLambdaExpression
         ,resultSelector : Linq.Expressions.JsLambdaExpression): IQueryable<TResult>{
-            return this._join<T,TJoined,TResult>(this.ObjectQuery,
-            new Linq.Expressions.ConstantExpression(joined,joined.Type)
+            return this._join<T,TJoined,TResult>(this,
+            joined
             ,predicate,resultSelector);
         }
-        _join<TSource,TJoined,TResult>(methodExp:Linq.Expressions.MethodCallExpression
-        ,joined : Linq.Expressions.ConstantExpression
+        _join<TSource,TJoined,TResult>(t_value:BaseQueryable
+        ,joined : BaseQueryable
         ,predicate: Linq.Expressions.JsLambdaExpression
         ,resultSelector : Linq.Expressions.JsLambdaExpression
         ):IQueryable<TResult>{
-            var result = new Queryable<TResult>();
-            result.ObjectQuery = new Linq.Expressions.MethodCallExpression();
-            result.ObjectQuery.Arguments = [methodExp,joined,predicate,resultSelector];
-            result.ObjectQuery.Method = "Join";
-            result.ObjectQuery.ReturnType = this._parseJoin(methodExp,
-            joined,
-            predicate,
-            resultSelector);
+            var result = new Queryable<TResult>(this.Provider);
+            var m_call_exp = new Linq.Expressions.MethodCallExpression();
+            m_call_exp.Arguments = [t_value,joined,predicate,resultSelector];
+            m_call_exp.Method = "Join";
+            m_call_exp.ReturnType = Linq.Queryable.CreateQueryableType(
+                this._parseJoin(t_value,joined,predicate,resultSelector)
+                );
+            result.ObjectQuery = m_call_exp;
+            result.Type = result.ObjectQuery.ReturnType;
             return result;
         }
-        private _parseJoin(methodExp:Linq.Expressions.MethodCallExpression
-        ,joined : Linq.Expressions.ConstantExpression
+        private _parseJoin(t_value:BaseQueryable
+        ,joined : BaseQueryable
         ,predicate: Linq.Expressions.JsLambdaExpression
         ,resultSelector : Linq.Expressions.JsLambdaExpression):RuntimeTypes.RuntimeType{
             let result = new RuntimeTypes.RuntimeType();
@@ -155,14 +190,14 @@ module Linq{
             result.Fields = resultSelectExp.body.body[0].argument.properties.map(element => {
                 let key = element.value.object.name;
                 if(key === sourceIdentify){
-                    let field = this.Type.GetField(element.value.property.name);
+                    let field = t_value.ElementType.GetField(element.value.property.name);
                     if(field == null){
                         throw Linq.Exceptions.ConstSystemExceptions.KeyNotFoundInEntity;
                     }
                     return {Name:element.key.name,NativeType:field.NativeType};
                 }
                 if(key === joinedIdentify){
-                    let field = joined.Type.GetField(element.value.property.name);
+                    let field = joined.ElementType.GetField(element.value.property.name);
                     if(field == null){
                         throw Linq.Exceptions.ConstSystemExceptions.KeyNotFoundInEntity;
                     }
@@ -173,19 +208,13 @@ module Linq{
 
             return result;
         }
-        ToList<T>():BaseQueryable[]{
-            let t = new Linq.Builder.SqlServerQueryBuilder<T>(this);
-            return t.expressionList;
-        }
-
-        
+        ToListWithCallBack<T>(callBack:(data:T[]) => any){
+            this.Provider.ToListWithCallBack(this,callBack);
+        }        
     }
 
     export class Grouping<TKey,TSource> extends Queryable<TSource> implements IGrouping<TKey,TSource>
     {
-        ObjectQuery:Linq.Expressions.MethodCallExpression;
-        Type : RuntimeTypes.RuntimeType;
-        KeyType:RuntimeTypes.RuntimeType;
         Key:TKey;
     }
 

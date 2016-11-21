@@ -1,7 +1,8 @@
+/// <reference path="RuntimeTypes/IRuntimeType.ts" />
 module Linq{
-    export interface IGrouping<TKey,TSource>
+    export interface IGrouping<TKey,TSource> extends RuntimeTypes.IRuntimeType
     {
-        KeyType:RuntimeTypes.RuntimeType;
+        Type : RuntimeTypes.RuntimeType;
         Key:TKey;
     }
 }

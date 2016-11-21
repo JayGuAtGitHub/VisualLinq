@@ -10,6 +10,6 @@ module Linq.Expressions{
         ReturnType:RuntimeTypes.RuntimeType;
         Method:string;
         Caller:any;
-        Arguments:IExpression[];
+        Arguments:any[];
     }
 }
