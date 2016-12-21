@@ -73,11 +73,20 @@ var Enumerables;
         }
         Enumerable.TryAny = function (source, predicator) {
             if (source != null && source != undefined) {
-                for (var _i = 0, source_1 = source; _i < source_1.length; _i++) {
-                    var i = source_1[_i];
+                return Enumerable.Any(source, predicator);
+            }
+            return false;
+        };
+        Enumerable.Any = function (source, predicator) {
+            for (var _i = 0, source_1 = source; _i < source_1.length; _i++) {
+                var i = source_1[_i];
+                if (predicator) {
                     if (predicator(i)) {
                         return true;
                     }
+                }
+                else {
+                    return true;
                 }
             }
             return false;
@@ -92,26 +101,85 @@ var Enumerables;
             if (source.length == 0) {
                 return defaultValue;
             }
-            if (source.length == 1) {
-                return source[0];
+            return Enumerable.Aggrate(source, aggrator);
+        };
+        Enumerable.Aggrate = function (source, aggrator) {
+            var cursor = 0;
+            var result;
+            for (var _i = 0, source_2 = source; _i < source_2.length; _i++) {
+                var i = source_2[_i];
+                if (cursor == 0) {
+                    result = i;
+                }
+                else {
+                    result = aggrator(result, i);
+                }
+                cursor++;
             }
-            var result = source[0];
-            for (var i = 1; i < source.length; i++) {
-                result = aggrator(result, source[i]);
+            if (cursor == 0) {
+                throw Enumerable.SOURCE_IS_EMPTY;
             }
             return result;
         };
         Enumerable.TryFirstOrDefault = function (source, predicator, defaultValue) {
             if (source != null && source != undefined) {
-                for (var _i = 0, source_2 = source; _i < source_2.length; _i++) {
-                    var i = source_2[_i];
+                return Enumerable.FirstOrDefault(source, predicator, defaultValue);
+            }
+            return defaultValue;
+        };
+        Enumerable.FirstOrDefault = function (source, predicator, defaultValue) {
+            for (var _i = 0, source_3 = source; _i < source_3.length; _i++) {
+                var i = source_3[_i];
+                if (predicator) {
                     if (predicator(i)) {
                         return i;
                     }
                 }
+                else {
+                    return i;
+                }
             }
             return defaultValue;
         };
+        Enumerable.First = function (source, predicator) {
+            for (var _i = 0, source_4 = source; _i < source_4.length; _i++) {
+                var i = source_4[_i];
+                if (predicator) {
+                    if (predicator(i)) {
+                        return i;
+                    }
+                }
+                else {
+                    return i;
+                }
+            }
+            throw Enumerable.SOURCE_IS_EMPTY;
+        };
+        Enumerable.Where = function (source, predicator) {
+            var result = [];
+            for (var _i = 0, source_5 = source; _i < source_5.length; _i++) {
+                var i = source_5[_i];
+                if (predicator(i)) {
+                    result.push(i);
+                }
+            }
+            if (result.length) {
+                return result;
+            }
+            return null;
+        };
+        Enumerable.Select = function (source, selector) {
+            var result = [];
+            for (var _i = 0, source_6 = source; _i < source_6.length; _i++) {
+                var i = source_6[_i];
+                result.push(selector(i));
+            }
+            if (result.length) {
+                return result;
+            }
+            return null;
+        };
+        Enumerable.SOURCE_IS_EMPTY = "source is empty";
         return Enumerable;
     }());
     Enumerables.Enumerable = Enumerable;
